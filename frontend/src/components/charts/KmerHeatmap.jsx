@@ -45,9 +45,9 @@ const KmerHeatmap = ({ genomeA, genomeB, darkMode }) => {
     x: ['Frequency Diff'],
     type: 'heatmap',
     colorscale: [
-      [0, '#3B82F6'],      // Blue (more in A)
+      [0, '#1E40AF'],      // Deep Blue (more in A)
       [0.5, '#F3F4F6'],    // White (equal)
-      [1, '#10B981']       // Green (more in B)
+      [1, '#F97316']       // Orange (more in B)
     ],
     zmid: 0,
     text: hoverText.map(t => [t]),
@@ -95,10 +95,40 @@ const KmerHeatmap = ({ genomeA, genomeB, darkMode }) => {
     modeBarButtonsToRemove: ['lasso2d', 'select2d', 'zoom2d', 'pan2d']
   };
 
+  // Generate summary insights
+  const generateSummary = () => {
+    const enrichedInA = top50.filter(d => d.diff > 0.01).length;
+    const enrichedInB = top50.filter(d => d.diff < -0.01).length;
+    const similar = top50.length - enrichedInA - enrichedInB;
+    const maxDiff = Math.max(...top50.map(d => Math.abs(d.diff)));
+    const mostDifferent = top50.find(d => Math.abs(d.diff) === maxDiff);
+    
+    let interpretation = '';
+    if (enrichedInA > enrichedInB * 1.5) {
+      interpretation = 'Genome A shows distinct k-mer signature - may indicate different codon usage or repeat patterns.';
+    } else if (enrichedInB > enrichedInA * 1.5) {
+      interpretation = 'Genome B has unique sequence composition - suggests divergent evolutionary pressures.';
+    } else if (similar > top50.length * 0.6) {
+      interpretation = 'High k-mer similarity indicates closely related genomes or similar functional constraints.';
+    } else {
+      interpretation = 'Balanced k-mer differences suggest moderate genomic divergence.';
+    }
+    
+    return {
+      enrichedInA,
+      enrichedInB,
+      similar,
+      mostDifferent,
+      interpretation
+    };
+  };
+  
+  const summary = generateSummary();
+
   return (
     <div className="w-full">
       <div className={`text-xs mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-        Top 50 most frequent 4-mers • Blue = More in A • Green = More in B
+        Top 50 most frequent 4-mers • <span className="text-blue-600 font-semibold">Blue</span> = More in A • <span className="text-orange-600 font-semibold">Orange</span> = More in B
       </div>
       <Plot
         data={data}
@@ -107,6 +137,47 @@ const KmerHeatmap = ({ genomeA, genomeB, darkMode }) => {
         style={{ width: '100%', height: '100%' }}
         useResizeHandler={true}
       />
+      
+      {/* AI Summary */}
+      <div className={`mt-4 p-4 rounded-xl border ${
+        darkMode 
+          ? 'bg-gradient-to-r from-blue-500/10 to-orange-500/10 border-blue-500/30' 
+          : 'bg-gradient-to-r from-blue-50 to-orange-50 border-blue-200'
+      }`}>
+        <div className="flex items-start gap-3">
+          <div className="text-2xl">🧬</div>
+          <div className="flex-1">
+            <h4 className={`text-sm font-bold mb-2 ${
+              darkMode ? 'text-blue-300' : 'text-blue-700'
+            }`}>
+              K-mer Analysis Summary
+            </h4>
+            <p className={`text-xs leading-relaxed mb-2 ${
+              darkMode ? 'text-gray-300' : 'text-gray-700'
+            }`}>
+              {summary.interpretation}
+            </p>
+            <div className="flex gap-4 text-xs">
+              <span className={darkMode ? 'text-blue-400' : 'text-blue-600'}>
+                <strong>{summary.enrichedInA}</strong> enriched in A
+              </span>
+              <span className={darkMode ? 'text-orange-400' : 'text-orange-600'}>
+                <strong>{summary.enrichedInB}</strong> enriched in B
+              </span>
+              <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+                <strong>{summary.similar}</strong> similar
+              </span>
+            </div>
+            {summary.mostDifferent && (
+              <div className={`mt-2 text-xs ${
+                darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>
+                Most different: <span className="font-mono font-bold">{summary.mostDifferent.kmer}</span> (Δ{Math.abs(summary.mostDifferent.diff).toFixed(3)}%)
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
